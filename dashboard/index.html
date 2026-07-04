@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BrandIntel Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:       #0d0f1a;
+    --surface:  #151827;
+    --card:     #1c2030;
+    --border:   #252a3a;
+    --accent:   #6366f1;
+    --accent2:  #818cf8;
+    --pos:      #22c55e;
+    --neg:      #ef4444;
+    --neu:      #f59e0b;
+    --text:     #e2e8f0;
+    --muted:    #64748b;
+    --font:     'Segoe UI', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; }
+
+  /* ── Layout ── */
+  .layout { display: flex; min-height: 100vh; }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 220px; background: var(--surface); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; padding: 24px 0; flex-shrink: 0;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; padding: 0 20px 28px; }
+  .logo-icon { width: 32px; height: 32px; background: var(--accent); border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  .logo-text { font-weight: 700; font-size: 17px; letter-spacing: -0.3px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; padding: 10px 20px;
+    color: var(--muted); cursor: pointer; border-radius: 0; font-size: 14px;
+    transition: all .15s;
+  }
+  .nav-item:hover, .nav-item.active {
+    background: rgba(99,102,241,.12); color: var(--accent2);
+    border-left: 3px solid var(--accent);
+  }
+  .nav-item.active { color: var(--accent2); font-weight: 600; }
+  .nav-label { font-size: 11px; color: var(--muted); padding: 16px 20px 6px; text-transform: uppercase; letter-spacing: .8px; }
+
+  /* ── Main ── */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .topbar {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 16px 28px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .topbar-title { font-size: 18px; font-weight: 700; }
+  .topbar-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+  .brand-select {
+    background: var(--card); border: 1px solid var(--border); color: var(--text);
+    padding: 8px 14px; border-radius: 8px; font-size: 14px; cursor: pointer;
+  }
+  .brand-select option { background: var(--card); }
+
+  .content { padding: 24px 28px; overflow-y: auto; flex: 1; }
+
+  /* ── Stat cards ── */
+  .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-bottom: 24px; }
+  .stat-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px; position: relative; overflow: hidden;
+  }
+  .stat-label { font-size: 12px; color: var(--muted); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .stat-value { font-size: 26px; font-weight: 800; letter-spacing: -1px; }
+  .stat-delta { font-size: 12px; margin-top: 4px; }
+  .stat-delta.up   { color: var(--pos); }
+  .stat-delta.down { color: var(--neg); }
+  .stat-icon { position: absolute; right: 16px; top: 16px; font-size: 20px; opacity: .4; }
+
+  /* ── Charts row ── */
+  .charts-row { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .chart-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px;
+  }
+  .chart-title { font-size: 14px; font-weight: 600; margin-bottom: 16px; }
+  .chart-wrap  { position: relative; }
+
+  /* sentiment legend */
+  .sent-legend { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+  .sent-row { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
+  .sent-dot { width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; display: inline-block; }
+
+  /* topics */
+  .topic-list { display: flex; flex-direction: column; gap: 8px; }
+  .topic-row { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
+  .topic-bar-wrap { flex: 1; height: 4px; background: var(--border); border-radius: 2px; margin: 0 10px; }
+  .topic-bar { height: 100%; background: var(--accent); border-radius: 2px; transition: width .4s; }
+  .topic-count { color: var(--muted); font-size: 12px; min-width: 32px; text-align: right; }
+
+  /* ── Mentions table ── */
+  .mentions-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px;
+  }
+  .mentions-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .filter-row { display: flex; gap: 8px; }
+  .filter-btn {
+    background: var(--surface); border: 1px solid var(--border); color: var(--muted);
+    padding: 6px 12px; border-radius: 20px; font-size: 12px; cursor: pointer; transition: all .15s;
+  }
+  .filter-btn.active, .filter-btn:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  .mention-row {
+    display: flex; align-items: flex-start; gap: 14px; padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .mention-row:last-child { border-bottom: none; }
+  .mention-source {
+    font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 20px; white-space: nowrap;
+    flex-shrink: 0; margin-top: 2px;
+  }
+  .source-amazon  { background: rgba(255,153,0,.15); color: #ff9900; }
+  .source-flipkart{ background: rgba(43,130,255,.15); color: #2b82ff; }
+  .source-reddit  { background: rgba(255,69,0,.15);   color: #ff4500; }
+  .mention-body { flex: 1; min-width: 0; }
+  .mention-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .mention-text  { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mention-meta  { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .mention-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+  .sent-badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+  .sent-positive { background: rgba(34,197,94,.15); color: var(--pos); }
+  .sent-negative { background: rgba(239,68,68,.15);  color: var(--neg); }
+  .sent-neutral  { background: rgba(245,158,11,.15); color: var(--neu); }
+  .stars { color: #f59e0b; font-size: 12px; }
+
+  /* loading */
+  .loading { color: var(--muted); font-size: 13px; padding: 20px 0; }
+  .empty   { color: var(--muted); font-size: 13px; padding: 20px 0; text-align: center; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">📊</div>
+      <span class="logo-text">BrandIntel</span>
+    </div>
+    <div class="nav-label">Menu</div>
+    <div class="nav-item active">🏠 Overview</div>
+    <div class="nav-item">💬 Mentions</div>
+    <div class="nav-item">📈 Insights</div>
+    <div class="nav-item">😊 Sentiment</div>
+    <div class="nav-item">🏷️ Topics</div>
+    <div class="nav-item">🔔 Alerts</div>
+    <div class="nav-label">Config</div>
+    <div class="nav-item">📦 Products</div>
+    <div class="nav-item">⚙️ Settings</div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <!-- Topbar -->
+    <div class="topbar">
+      <div>
+        <div class="topbar-title">Overview</div>
+        <div class="topbar-sub">Track your brand performance across the internet</div>
+      </div>
+      <select class="brand-select" id="brandSelect" onchange="loadDashboard()">
+        <option value="">Loading brands…</option>
+      </select>
+    </div>
+
+    <div class="content">
+
+      <!-- Stats -->
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card"><div class="loading">Loading…</div></div>
+      </div>
+
+      <!-- Charts -->
+      <div class="charts-row">
+        <!-- Mentions over time -->
+        <div class="chart-card">
+          <div class="chart-title">Mentions Over Time</div>
+          <div class="chart-wrap" style="height:180px">
+            <canvas id="mentionsChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Sentiment donut -->
+        <div class="chart-card">
+          <div class="chart-title">Sentiment Overview</div>
+          <div class="chart-wrap" style="height:150px">
+            <canvas id="sentimentChart"></canvas>
+          </div>
+          <div class="sent-legend" id="sentLegend"></div>
+        </div>
+
+        <!-- Top topics -->
+        <div class="chart-card">
+          <div class="chart-title">Top Topics</div>
+          <div class="topic-list" id="topicList">
+            <div class="loading">Loading…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mentions table -->
+      <div class="mentions-card">
+        <div class="mentions-header">
+          <div class="chart-title" style="margin:0">Recent Mentions</div>
+          <div class="filter-row">
+            <button class="filter-btn active" onclick="filterMentions('all',this)">All</button>
+            <button class="filter-btn" onclick="filterMentions('amazon',this)">Amazon</button>
+            <button class="filter-btn" onclick="filterMentions('flipkart',this)">Flipkart</button>
+            <button class="filter-btn" onclick="filterMentions('reddit',this)">Reddit</button>
+          </div>
+        </div>
+        <div id="mentionsList"><div class="loading">Loading…</div></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+const API = "http://localhost:8000/api";
+let mentionsChart, sentimentChart;
+let currentFilter = "all";
+
+// ── Utility ──────────────────────────────────────────────────────────────────
+const $  = id => document.getElementById(id);
+const fmt = n  => n >= 1000 ? (n/1000).toFixed(1)+"K" : n;
+const stars = r => r ? "★".repeat(Math.round(r)) + "☆".repeat(5-Math.round(r)) : "";
+
+async function api(path) {
+  const r = await fetch(API + path);
+  return r.json();
+}
+
+// ── Load brands ───────────────────────────────────────────────────────────────
+async function loadBrands() {
+  const brands = await api("/brands");
+  const sel = $("brandSelect");
+  sel.innerHTML = brands.map(b =>
+    `<option value="${b.id}">${b.name}</option>`
+  ).join("");
+  loadDashboard();
+}
+
+// ── Main loader ───────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  const brandId = $("brandSelect").value;
+  if (!brandId) return;
+
+  const [overview, sentiment, topics, timeline, mentions] = await Promise.all([
+    api(`/overview?brand_id=${brandId}`),
+    api(`/sentiment?brand_id=${brandId}`),
+    api(`/top-topics?brand_id=${brandId}`),
+    api(`/mentions-over-time?brand_id=${brandId}`),
+    api(`/mentions?brand_id=${brandId}&limit=10`),
+  ]);
+
+  renderStats(overview);
+  renderSentiment(sentiment);
+  renderTopics(topics);
+  renderTimeline(timeline);
+  renderMentions(mentions);
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+function renderStats(d) {
+  $("statsGrid").innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">💬 Total Mentions</div>
+      <div class="stat-value">${fmt(d.total_mentions)}</div>
+      <div class="stat-icon">💬</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">✅ Positive</div>
+      <div class="stat-value" style="color:var(--pos)">${fmt(d.positive)}</div>
+      <div class="stat-delta up">▲ ${d.positive_pct}% of total</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">❌ Negative</div>
+      <div class="stat-value" style="color:var(--neg)">${fmt(d.negative)}</div>
+      <div class="stat-delta down">▼ ${d.negative_pct}% of total</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">⚖️ Neutral</div>
+      <div class="stat-value" style="color:var(--neu)">${fmt(d.neutral)}</div>
+      <div class="stat-delta" style="color:var(--muted)">${d.neutral_pct}% of total</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">⭐ Avg Rating</div>
+      <div class="stat-value">${d.avg_rating ?? "—"}</div>
+      <div class="stat-delta" style="color:var(--muted)">across all sources</div>
+    </div>
+  `;
+}
+
+// ── Sentiment donut ───────────────────────────────────────────────────────────
+function renderSentiment(d) {
+  const colMap = { positive: "#22c55e", negative: "#ef4444", neutral: "#f59e0b", unanalysed: "#64748b" };
+  const labels = d.breakdown.map(x => x.sentiment);
+  const data   = d.breakdown.map(x => x.count);
+  const colors = labels.map(l => colMap[l] || "#64748b");
+
+  if (sentimentChart) sentimentChart.destroy();
+  sentimentChart = new Chart($("sentimentChart"), {
+    type: "doughnut",
+    data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 0 }] },
+    options: {
+      cutout: "72%", plugins: { legend: { display: false } },
+      maintainAspectRatio: false,
+    },
+  });
+
+  $("sentLegend").innerHTML = d.breakdown.map(x => `
+    <div class="sent-row">
+      <span><span class="sent-dot" style="background:${colMap[x.sentiment]||'#64748b'}"></span>${x.sentiment}</span>
+      <span style="color:var(--muted)">${x.pct}%</span>
+    </div>
+  `).join("");
+}
+
+// ── Timeline line chart ───────────────────────────────────────────────────────
+function renderTimeline(data) {
+  if (mentionsChart) mentionsChart.destroy();
+  mentionsChart = new Chart($("mentionsChart"), {
+    type: "line",
+    data: {
+      labels: data.map(d => d.date),
+      datasets: [{
+        data: data.map(d => d.count),
+        borderColor: "#6366f1",
+        backgroundColor: "rgba(99,102,241,.08)",
+        fill: true, tension: 0.4, pointRadius: 2,
+      }],
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: "#64748b", maxTicksLimit: 6 }, grid: { color: "#252a3a" } },
+        y: { ticks: { color: "#64748b" }, grid: { color: "#252a3a" } },
+      },
+      maintainAspectRatio: false,
+    },
+  });
+}
+
+// ── Top topics ────────────────────────────────────────────────────────────────
+function renderTopics(topics) {
+  if (!topics.length) { $("topicList").innerHTML = '<div class="empty">No data yet</div>'; return; }
+  const max = topics[0].count;
+  $("topicList").innerHTML = topics.map(t => `
+    <div class="topic-row">
+      <span style="font-size:12px;min-width:90px;color:var(--accent2)">#${t.topic}</span>
+      <div class="topic-bar-wrap"><div class="topic-bar" style="width:${Math.round(t.count/max*100)}%"></div></div>
+      <span class="topic-count">${t.count}</span>
+    </div>
+  `).join("");
+}
+
+// ── Mentions list ─────────────────────────────────────────────────────────────
+function renderMentions(mentions) {
+  if (!mentions.length) { $("mentionsList").innerHTML = '<div class="empty">No mentions yet — run the collector first.</div>'; return; }
+  $("mentionsList").innerHTML = mentions.map(m => `
+    <div class="mention-row">
+      <span class="mention-source source-${m.source}">${m.source}</span>
+      <div class="mention-body">
+        <div class="mention-title">${m.title || "(no title)"}</div>
+        <div class="mention-text">${m.content || ""}</div>
+        <div class="mention-meta">${m.author || "Anonymous"} · ${m.product} · ${m.created_at ? m.created_at.slice(0,10) : ""}</div>
+      </div>
+      <div class="mention-right">
+        ${m.sentiment ? `<span class="sent-badge sent-${m.sentiment}">${m.sentiment}</span>` : ""}
+        ${m.rating ? `<span class="stars">${stars(m.rating)}</span>` : ""}
+      </div>
+    </div>
+  `).join("");
+}
+
+async function filterMentions(source, btn) {
+  document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  currentFilter = source;
+  const brandId = $("brandSelect").value;
+  const src = source === "all" ? "" : `&source=${source}`;
+  const mentions = await api(`/mentions?brand_id=${brandId}&limit=10${src}`);
+  renderMentions(mentions);
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+loadBrands();
+</script>
+</body>
+</html>
